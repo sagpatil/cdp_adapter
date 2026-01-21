@@ -22,14 +22,18 @@ app.post('/wallets', async (req: Request, res: Response) => {
   try {
     const wallet = await adapter.createWallet();
     
-    // Include the secret key in the response (ONLY for demo purposes!)
-    // In production, this should be encrypted and stored securely
-    const keypair = adapter.getWalletKeypair(wallet.address);
+    // Include the secret key in the response ONLY if explicitly enabled
+    // SECURITY WARNING: Never expose secret keys in production!
+    const includeSecretKey = process.env.EXPOSE_SECRET_KEYS === 'true' || process.env.NODE_ENV === 'development';
+    const keypair = includeSecretKey ? adapter.getWalletKeypair(wallet.address) : undefined;
     
-    res.status(201).json({
-      wallet,
-      secretKey: keypair?.secretKey, // WARNING: Never expose secret keys in production!
-    });
+    const response: any = { wallet };
+    if (keypair) {
+      response.secretKey = keypair.secretKey;
+      response.warning = 'SECRET KEY INCLUDED - Store securely and never share!';
+    }
+    
+    res.status(201).json(response);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

@@ -64,10 +64,12 @@ export interface FeeBumpConfig {
 
 /** Stellar Foundation sponsor accounts (for fee bumps) */
 export const STELLAR_FOUNDATION_SPONSORS: Record<Network, string> = {
-  // These are example addresses - replace with actual Stellar Foundation sponsor accounts
-  testnet: 'GCTESTNETSPONSORFEEACCOUNT123456789ABCDEFGH',
-  mainnet: 'GCMAINNETSPONSORFEEACCOUNT123456789ABCDEFGH',
-  futurenet: 'GCFUTURENETSPONSORFEEACCOUNT123456789ABCDEFG',
+  // NOTE: These are placeholder addresses. For production use, these should be configured
+  // via environment variables or secure configuration management.
+  // Contact Stellar Foundation for actual sponsor account addresses.
+  testnet: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+  mainnet: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+  futurenet: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
 };
 
 /** Network passphrase constants */
