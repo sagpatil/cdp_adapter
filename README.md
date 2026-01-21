@@ -30,6 +30,7 @@ const adapter = new StellarWalletAdapter({
 
 // Create a wallet
 const wallet = await adapter.createWallet();
+console.log('Wallet address:', wallet.address);
 
 // Send a payment
 const tx = await adapter.sendTransaction({
@@ -38,6 +39,7 @@ const tx = await adapter.sendTransaction({
   amount: '10',
   asset: 'native',
 });
+console.log('Transaction hash:', tx.hash);
 
 // Fee bump a pending transaction (sponsored by Stellar Foundation or custom sponsor)
 const bumpedTx = await adapter.feeBumpTransaction(
@@ -50,7 +52,17 @@ const bumpedTx = await adapter.feeBumpTransaction(
 ### As a REST Server
 
 ```bash
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Start the server
 npm run start:server
+
+# Or with custom configuration
+STELLAR_NETWORK=testnet PORT=3000 npm run start:server
 ```
 
 The server exposes CDP-compatible endpoints:
@@ -62,6 +74,15 @@ The server exposes CDP-compatible endpoints:
 - `GET /transactions/:hash` - Get transaction status
 - `POST /transactions/:hash/fee-bump` - Bump the fee of a pending transaction
 - `GET /sponsor` - Get Stellar Foundation sponsor address for current network
+
+### Environment Variables
+
+- `STELLAR_NETWORK` - Network to use (testnet, mainnet, futurenet) - default: testnet
+- `HORIZON_URL` - Custom Horizon API URL (optional)
+- `SOROBAN_RPC_URL` - Custom Soroban RPC URL (optional)
+- `PORT` - Server port - default: 3000
+- `EXPOSE_SECRET_KEYS` - Set to 'true' to expose secret keys in API responses (development only!)
+- `NODE_ENV` - Set to 'development' to enable secret key exposure
 
 ## Architecture
 
