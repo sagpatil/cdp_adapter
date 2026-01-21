@@ -86,6 +86,12 @@ The server exposes CDP-compatible endpoints:
 - `EXPOSE_SECRET_KEYS` - Set to 'true' to expose secret keys in API responses (development only!)
 - `NODE_ENV` - Set to 'development' to enable secret key exposure
 
+Fee bump sponsorship (optional):
+
+- `STELLAR_FOUNDATION_SPONSOR_SECRET_KEY` - Sponsor secret key used when `sponsorSecretKey` is not provided
+- `STELLAR_FOUNDATION_SPONSOR_SECRET_TESTNET|MAINNET|FUTURENET` - Per-network override for the above
+- `STELLAR_FOUNDATION_SPONSOR_TESTNET|MAINNET|FUTURENET` - Optional sponsor *address* to expose via `/sponsor` (if not set, address is derived from the sponsor secret key when available)
+
 ## Architecture
 
 ```
@@ -108,6 +114,9 @@ const adapter = new StellarWalletAdapter({
   network: 'mainnet' | 'testnet' | 'futurenet',
   horizonUrl: 'https://horizon.stellar.org', // optional
   sorobanRpcUrl: 'https://soroban-rpc.stellar.org', // optional
+  onEvent: (event) => {
+    // optional: receive normalized CDP-style events
+  },
 });
 ```
 

@@ -6,10 +6,52 @@ import type { StellarAccount, StellarBalance, StellarTransactionResult, StellarN
 export class StellarRpcClient {
   private server: StellarSdk.Horizon.Server;
   private networkPassphrase: string;
+  private maxRetries: number;
 
-  constructor(config: StellarNetworkConfig) {
-    this.server = new StellarSdk.Horizon.Server(config.horizonUrl);
+  constructor(
+    config: StellarNetworkConfig,
+    options?: {
+      server?: StellarSdk.Horizon.Server;
+      maxRetries?: number;
+    }
+  ) {
+    this.server = options?.server ?? new StellarSdk.Horizon.Server(config.horizonUrl);
     this.networkPassphrase = config.networkPassphrase;
+    this.maxRetries = Number.isFinite(options?.maxRetries as number) ? (options!.maxRetries as number) : 2;
+  }
+
+  private isRetryableError(error: any): boolean {
+    const status = error?.response?.status;
+    if (typeof status === 'number' && status >= 500) return true;
+
+    const code = error?.code;
+    if (typeof code === 'string' && ['ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN', 'ENOTFOUND'].includes(code)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private async withRetries<T>(operation: () => Promise<T>): Promise<T> {
+    let lastError: unknown;
+    const attempts = Math.max(0, Math.floor(this.maxRetries)) + 1;
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        if (attempt >= attempts || !this.isRetryableError(error)) {
+          throw error;
+        }
+
+        // Tiny backoff to avoid hot-looping on transient network errors
+        await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+      }
+    }
+
+    // Unreachable, but keeps TS happy
+    throw lastError;
   }
 
   /**
@@ -41,22 +83,21 @@ export class StellarRpcClient {
    */
   async submitTransaction(transactionXdr: string): Promise<StellarTransactionResult> {
     try {
-      const response = await this.server.submitTransaction(
-        new Transaction(transactionXdr, this.networkPassphrase)
+      const response = await this.withRetries(() =>
+        this.server.submitTransaction(new Transaction(transactionXdr, this.networkPassphrase))
       );
 
       return {
-        hash: response.hash,
-        ledger: response.ledger,
-        successful: response.successful,
-        resultXdr: response.result_xdr,
-        envelopeXdr: response.envelope_xdr,
+        hash: (response as any).hash,
+        ledger: (response as any).ledger,
+        successful: (response as any).successful,
+        resultXdr: (response as any).result_xdr,
+        envelopeXdr: (response as any).envelope_xdr,
       };
     } catch (error: any) {
-      // Horizon returns detailed error in response
-      const message = error.response?.data?.extras?.result_codes 
+      const message = error?.response?.data?.extras?.result_codes
         ? JSON.stringify(error.response.data.extras.result_codes)
-        : error.message;
+        : error?.message;
       throw new Error(`Transaction submission failed: ${message}`);
     }
   }
@@ -72,8 +113,8 @@ export class StellarRpcClient {
   async submitFeeBumpTransaction(feeBumpTransactionXdr: string): Promise<StellarTransactionResult> {
     try {
       const feeBumpTx = new FeeBumpTransaction(feeBumpTransactionXdr, this.networkPassphrase);
-      
-      const response = await this.server.submitTransaction(feeBumpTx);
+
+      const response = await this.withRetries(() => this.server.submitTransaction(feeBumpTx));
 
       return {
         hash: response.hash,
@@ -99,6 +140,23 @@ export class StellarRpcClient {
       return tx;
     } catch (error: any) {
       throw new Error(`Failed to get transaction: ${error.message}`);
+    }
+  }
+
+  /**
+   * Fetch a transaction and its operations.
+   * Note: Horizon's transaction endpoint typically does not inline operations.
+   */
+  async getTransactionWithOperations(hash: string): Promise<any> {
+    try {
+      const tx = await this.getTransaction(hash);
+      const operationsPage = await (this.server as any).operations().forTransaction(hash).call();
+      return {
+        ...tx,
+        operations: Array.isArray(operationsPage?.records) ? operationsPage.records : operationsPage,
+      };
+    } catch (error: any) {
+      throw new Error(`Failed to get transaction with operations: ${error.message}`);
     }
   }
 

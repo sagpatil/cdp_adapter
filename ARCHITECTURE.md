@@ -162,6 +162,10 @@ Client → StellarWalletAdapter.feeBumpTransaction(hash, maxFee, sponsor)
 | `STELLAR_FOUNDATION_SPONSOR_TESTNET` | Sponsor address for testnet | (empty) |
 | `STELLAR_FOUNDATION_SPONSOR_MAINNET` | Sponsor address for mainnet | (empty) |
 | `STELLAR_FOUNDATION_SPONSOR_FUTURENET` | Sponsor address for futurenet | (empty) |
+| `STELLAR_FOUNDATION_SPONSOR_SECRET_KEY` | Sponsor secret used for fee bumps (generic) | (empty) |
+| `STELLAR_FOUNDATION_SPONSOR_SECRET_TESTNET` | Sponsor secret used for fee bumps (testnet) | (empty) |
+| `STELLAR_FOUNDATION_SPONSOR_SECRET_MAINNET` | Sponsor secret used for fee bumps (mainnet) | (empty) |
+| `STELLAR_FOUNDATION_SPONSOR_SECRET_FUTURENET` | Sponsor secret used for fee bumps (futurenet) | (empty) |
 
 ## Directory Structure
 

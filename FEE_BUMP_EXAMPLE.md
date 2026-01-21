@@ -82,15 +82,16 @@ curl http://localhost:3000/sponsor
 
 ## Configuration
 
-To use Stellar Foundation sponsorship in production:
+To use sponsorship in production:
 
 1. Configure the sponsor secret key via environment variable or secure key management
-2. Contact Stellar Foundation for actual sponsor account addresses
-3. Update `STELLAR_FOUNDATION_SPONSORS` in `src/types/stellar.ts`
+  - `STELLAR_FOUNDATION_SPONSOR_SECRET_KEY` (generic)
+  - `STELLAR_FOUNDATION_SPONSOR_SECRET_TESTNET|MAINNET|FUTURENET` (per-network)
+2. (Optional) Configure the sponsor address env vars used by `/sponsor`
 
 ## Important Notes
 
 - Fee bump transactions require the inner transaction to still be pending
 - The max fee must be higher than the original transaction fee
 - The sponsor account must have sufficient balance to pay the fee
-- Current implementation uses placeholder sponsor addresses - replace with actual ones for production
+- Prefer per-network sponsor secrets for safety and clarity

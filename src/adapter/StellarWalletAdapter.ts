@@ -8,6 +8,7 @@ import { FeeEstimator } from './FeeEstimator';
 import { StellarRpcClient } from '../rpc/StellarRpcClient';
 import { EventNormalizer } from '../events/EventNormalizer';
 import { TransactionRequestSchema } from '../types/cdp';
+import type { CDPEvent } from '../types/cdp';
 
 export class StellarWalletAdapter {
   private config: CDPAdapterConfig;
@@ -19,7 +20,17 @@ export class StellarWalletAdapter {
   private eventNormalizer: EventNormalizer;
   private walletStore: Map<string, { wallet: CDPWallet; keypair: StellarKeypair }>;
 
-  constructor(config: CDPAdapterConfig) {
+  constructor(
+    config: CDPAdapterConfig,
+    deps?: Partial<{
+      rpcClient: StellarRpcClient;
+      transactionBuilder: TransactionBuilder;
+      signer: Signer;
+      feeEstimator: FeeEstimator;
+      eventNormalizer: EventNormalizer;
+      walletStore: Map<string, { wallet: CDPWallet; keypair: StellarKeypair }>;
+    }>
+  ) {
     this.config = config;
     
     // Build network configuration
@@ -30,13 +41,63 @@ export class StellarWalletAdapter {
       networkPassphrase: NETWORK_PASSPHRASES[config.network],
     };
 
-    // Initialize components
-    this.rpcClient = new StellarRpcClient(this.networkConfig);
-    this.transactionBuilder = new TransactionBuilder(this.networkConfig.networkPassphrase);
-    this.signer = new Signer();
-    this.feeEstimator = new FeeEstimator(this.rpcClient);
-    this.eventNormalizer = new EventNormalizer();
-    this.walletStore = new Map();
+    // Initialize components (allow injection for testing)
+    this.rpcClient = deps?.rpcClient ?? new StellarRpcClient(this.networkConfig);
+    this.transactionBuilder = deps?.transactionBuilder ?? new TransactionBuilder(this.networkConfig.networkPassphrase);
+    this.signer = deps?.signer ?? new Signer();
+    this.feeEstimator = deps?.feeEstimator ?? new FeeEstimator(this.rpcClient);
+    this.eventNormalizer = deps?.eventNormalizer ?? new EventNormalizer();
+    this.walletStore = deps?.walletStore ?? new Map();
+  }
+
+  private emit(event: CDPEvent): void {
+    try {
+      this.config.onEvent?.(event);
+    } catch {
+      // Never let event hooks break wallet operations
+    }
+  }
+
+  private extractPaymentDetails(tx: any): { to: string; amount: string; asset: string } {
+    let to = '';
+    let amount = '';
+    let asset = 'native';
+
+    const operations = Array.isArray(tx?.operations)
+      ? tx.operations
+      : Array.isArray(tx?._embedded?.records)
+        ? tx._embedded.records
+        : undefined;
+
+    if (operations && operations.length > 0) {
+      const paymentOp = operations.find((op: any) => op && op.type === 'payment');
+      if (paymentOp) {
+        if (typeof paymentOp.to === 'string') to = paymentOp.to;
+        if (typeof paymentOp.amount === 'string') amount = paymentOp.amount;
+        if (typeof paymentOp.asset_type === 'string') {
+          if (paymentOp.asset_type === 'native') {
+            asset = 'native';
+          } else if (typeof paymentOp.asset_code === 'string' && paymentOp.asset_code.length > 0) {
+            asset = paymentOp.asset_issuer
+              ? `${paymentOp.asset_code}:${paymentOp.asset_issuer}`
+              : paymentOp.asset_code;
+          }
+        }
+      }
+    }
+
+    return { to, amount, asset };
+  }
+
+  private getFoundationSponsorSecretForNetwork(): string | undefined {
+    const network = this.config.network;
+    const upper = network.toUpperCase();
+
+    // Prefer per-network env var, then fall back to a generic one.
+    const perNetwork = process.env[`STELLAR_FOUNDATION_SPONSOR_SECRET_${upper}`];
+    const generic = process.env.STELLAR_FOUNDATION_SPONSOR_SECRET_KEY;
+    const secret = (perNetwork ?? generic)?.trim();
+    return secret || undefined;
   }
 
   /**
@@ -56,6 +117,8 @@ export class StellarWalletAdapter {
 
     // Store wallet and keypair
     this.walletStore.set(wallet.address, { wallet, keypair });
+
+    this.emit(this.eventNormalizer.createWalletCreatedEvent(wallet));
 
     return wallet;
   }
@@ -117,6 +180,8 @@ export class StellarWalletAdapter {
         createdAt: new Date().toISOString(),
       };
 
+      this.emit(this.eventNormalizer.createTransactionPendingEvent(cdpTransaction));
+
       // Submit to network
       const result = await this.rpcClient.submitTransaction(signedTransaction.toXDR());
 
@@ -124,6 +189,8 @@ export class StellarWalletAdapter {
       cdpTransaction.status = result.successful ? 'success' : 'failed';
       cdpTransaction.confirmedAt = new Date().toISOString();
       cdpTransaction.ledger = result.ledger;
+
+      this.emit(this.eventNormalizer.normalizeTransactionResult(cdpTransaction, result.successful));
 
       return cdpTransaction;
     } catch (error: any) {
@@ -136,33 +203,8 @@ export class StellarWalletAdapter {
    */
   async getTransaction(hash: string): Promise<CDPTransaction> {
     try {
-      const tx = await this.rpcClient.getTransaction(hash);
-
-      // Best-effort extraction of destination, amount and asset from operations (if present)
-      let to = '';
-      let amount = '';
-      let asset = 'native';
-
-      const txAny: any = tx as any;
-      const operations = Array.isArray(txAny.operations) ? txAny.operations : undefined;
-      if (operations && operations.length > 0) {
-        const paymentOp = operations.find((op: any) => op && op.type === 'payment');
-        if (paymentOp) {
-          if (typeof paymentOp.to === 'string') {
-            to = paymentOp.to;
-          }
-          if (typeof paymentOp.amount === 'string') {
-            amount = paymentOp.amount;
-          }
-          if (typeof paymentOp.asset_type === 'string') {
-            if (paymentOp.asset_type === 'native') {
-              asset = 'native';
-            } else if (typeof paymentOp.asset_code === 'string' && paymentOp.asset_code.length > 0) {
-              asset = paymentOp.asset_code;
-            }
-          }
-        }
-      }
+      const tx = await this.rpcClient.getTransactionWithOperations(hash);
+      const { to, amount, asset } = this.extractPaymentDetails(tx);
 
       // Convert Stellar transaction to CDP format
       const cdpTransaction: CDPTransaction = {
@@ -232,7 +274,7 @@ export class StellarWalletAdapter {
   ): Promise<CDPTransaction> {
     try {
       // Get the original transaction
-      const originalTx = await this.rpcClient.getTransaction(transactionHash);
+      const originalTx = await this.rpcClient.getTransactionWithOperations(transactionHash);
       const originalEnvelopeXdr = originalTx.envelope_xdr;
 
       // Determine the fee source (sponsor)
@@ -244,13 +286,16 @@ export class StellarWalletAdapter {
         feeSourceSecret = sponsorSecretKey;
         feeSourceAddress = this.signer.getPublicKey(sponsorSecretKey);
       } else {
-        // Use Stellar Foundation sponsor for the current network
-        // Note: In production, this would require secure key management
-        // For now, this is a placeholder - the actual secret key would need to be configured
-        throw new Error(
-          'Stellar Foundation sponsorship requires configuration of sponsor secret key. ' +
-          `Please provide sponsorSecretKey parameter or configure STELLAR_FOUNDATION_SPONSOR_SECRET_KEY environment variable for ${this.config.network}`
-        );
+        const envSecret = this.getFoundationSponsorSecretForNetwork();
+        if (!envSecret) {
+          throw new Error(
+            'Fee bump sponsorship requires a sponsor secret key. ' +
+              'Provide sponsorSecretKey or set STELLAR_FOUNDATION_SPONSOR_SECRET_KEY ' +
+              `or STELLAR_FOUNDATION_SPONSOR_SECRET_${this.config.network.toUpperCase()}.`
+          );
+        }
+        feeSourceSecret = envSecret;
+        feeSourceAddress = this.signer.getPublicKey(envSecret);
       }
 
       // Build fee bump transaction
@@ -276,31 +321,7 @@ export class StellarWalletAdapter {
         signedFeeBumpTx.toXDR()
       );
 
-      // Best-effort extraction of destination, amount and asset from original transaction
-      let to = '';
-      let amount = '';
-      let asset = 'native';
-
-      const txAny: any = originalTx as any;
-      const operations = Array.isArray(txAny.operations) ? txAny.operations : undefined;
-      if (operations && operations.length > 0) {
-        const paymentOp = operations.find((op: any) => op && op.type === 'payment');
-        if (paymentOp) {
-          if (typeof paymentOp.to === 'string') {
-            to = paymentOp.to;
-          }
-          if (typeof paymentOp.amount === 'string') {
-            amount = paymentOp.amount;
-          }
-          if (typeof paymentOp.asset_type === 'string') {
-            if (paymentOp.asset_type === 'native') {
-              asset = 'native';
-            } else if (typeof paymentOp.asset_code === 'string' && paymentOp.asset_code.length > 0) {
-              asset = paymentOp.asset_code;
-            }
-          }
-        }
-      }
+      const { to, amount, asset } = this.extractPaymentDetails(originalTx);
 
       // Create CDP transaction object for the fee bump
       const cdpTransaction: CDPTransaction = {
@@ -317,6 +338,8 @@ export class StellarWalletAdapter {
         ledger: result.ledger,
       };
 
+      this.emit(this.eventNormalizer.normalizeTransactionResult(cdpTransaction, result.successful));
+
       return cdpTransaction;
     } catch (error: any) {
       throw new Error(`Fee bump failed: ${error.message}`);
@@ -327,7 +350,11 @@ export class StellarWalletAdapter {
    * Get the Stellar Foundation sponsor address for the current network
    */
   getStellarFoundationSponsor(): string {
-    return STELLAR_FOUNDATION_SPONSORS[this.config.network];
+    const configuredAddress = STELLAR_FOUNDATION_SPONSORS[this.config.network];
+    if (configuredAddress) return configuredAddress;
+
+    const envSecret = this.getFoundationSponsorSecretForNetwork();
+    return envSecret ? this.signer.getPublicKey(envSecret) : '';
   }
 
   // Helper methods

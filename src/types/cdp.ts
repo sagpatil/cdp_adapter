@@ -58,6 +58,8 @@ export interface CDPAdapterConfig {
   network: Network;
   horizonUrl?: string;
   sorobanRpcUrl?: string;
+  /** Optional event hook (useful for SDK consumers / server streaming). */
+  onEvent?: (event: CDPEvent) => void;
 }
 
 // Zod schemas for runtime validation
