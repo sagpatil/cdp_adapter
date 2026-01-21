@@ -1,5 +1,5 @@
 // Signer - Handles Stellar keypair management and transaction signing
-import { Keypair, Transaction } from '@stellar/stellar-sdk';
+import { Keypair, Transaction, FeeBumpTransaction } from '@stellar/stellar-sdk';
 import type { StellarKeypair } from '../types/stellar';
 
 export class Signer {
@@ -22,9 +22,22 @@ export class Signer {
   }
 
   /**
-   * Sign a Stellar transaction
+   * Sign a Stellar transaction.
+   * NOTE: This method mutates the input transaction by adding a signature.
+   * The original transaction object will be modified.
    */
   signTransaction(transaction: Transaction, secretKey: string): Transaction {
+    const keypair = this.loadKeypair(secretKey);
+    transaction.sign(keypair);
+    return transaction;
+  }
+
+  /**
+   * Sign a Stellar fee bump transaction.
+   * NOTE: This method mutates the input transaction by adding a signature.
+   * The original transaction object will be modified.
+   */
+  signFeeBumpTransaction(transaction: FeeBumpTransaction, secretKey: string): FeeBumpTransaction {
     const keypair = this.loadKeypair(secretKey);
     transaction.sign(keypair);
     return transaction;

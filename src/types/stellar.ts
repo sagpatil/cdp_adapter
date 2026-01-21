@@ -63,13 +63,13 @@ export interface FeeBumpConfig {
 }
 
 /** Stellar Foundation sponsor accounts (for fee bumps) */
+// NOTE: These must be configured via environment variables or secure configuration
+// management. Contact the Stellar Foundation for actual sponsor account addresses.
+// Empty strings indicate that a sponsor account has not been configured.
 export const STELLAR_FOUNDATION_SPONSORS: Record<Network, string> = {
-  // NOTE: These are placeholder addresses. For production use, these should be configured
-  // via environment variables or secure configuration management.
-  // Contact Stellar Foundation for actual sponsor account addresses.
-  testnet: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
-  mainnet: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
-  futurenet: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+  testnet: process.env.STELLAR_FOUNDATION_SPONSOR_TESTNET ?? '',
+  mainnet: process.env.STELLAR_FOUNDATION_SPONSOR_MAINNET ?? '',
+  futurenet: process.env.STELLAR_FOUNDATION_SPONSOR_FUTURENET ?? '',
 };
 
 /** Network passphrase constants */

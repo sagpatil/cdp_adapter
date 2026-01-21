@@ -40,6 +40,8 @@ async function feeBumpExample() {
 
   // If the transaction is stuck, bump the fee
   // You can provide your own sponsor secret key, or rely on configured Stellar Foundation sponsor
+  // Note: sponsorSecretKey should be defined by the user or loaded from secure configuration
+  const sponsorSecretKey = process.env.SPONSOR_SECRET_KEY; // Load from environment
   const bumpedTx = await adapter.feeBumpTransaction(
     originalTx.hash,
     '20000', // max fee in stroops (0.002 XLM)

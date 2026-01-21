@@ -13,7 +13,18 @@ const config: CDPAdapterConfig = {
   sorobanRpcUrl: process.env.SOROBAN_RPC_URL,
 };
 
+// WARNING: This adapter instance uses an in-memory wallet store that is shared
+// across all requests. This is intended for development/demo use only and is
+// not suitable for multi-tenant or production deployments where wallet
+// isolation and a persistent backend are required.
 const adapter = new StellarWalletAdapter(config);
+
+if (process.env.NODE_ENV === 'production') {
+  console.warn(
+    'WARNING: In-memory StellarWalletAdapter is not recommended for production. ' +
+    'Implement a per-tenant wallet store or persistent backend before deploying this server.'
+  );
+}
 
 /**
  * POST /wallets - Create a new wallet
@@ -24,7 +35,7 @@ app.post('/wallets', async (req: Request, res: Response) => {
     
     // Include the secret key in the response ONLY if explicitly enabled
     // SECURITY WARNING: Never expose secret keys in production!
-    const includeSecretKey = process.env.EXPOSE_SECRET_KEYS === 'true' || process.env.NODE_ENV === 'development';
+    const includeSecretKey = process.env.EXPOSE_SECRET_KEYS === 'true';
     const keypair = includeSecretKey ? adapter.getWalletKeypair(wallet.address) : undefined;
     
     const response: any = { wallet };
@@ -62,7 +73,19 @@ app.post('/wallets/import', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'secretKey is required' });
     }
 
-    const wallet = await adapter.importWallet(secretKey);
+    // Basic Stellar secret key validation to prevent malformed input
+    if (typeof secretKey !== 'string') {
+      return res.status(400).json({ error: 'secretKey must be a string' });
+    }
+
+    const trimmedSecretKey = secretKey.trim();
+    // Stellar secret keys (StrKey) are 56-char base32 strings starting with 'S'
+    const stellarSecretKeyPattern = /^S[A-Z2-7]{55}$/;
+    if (!stellarSecretKeyPattern.test(trimmedSecretKey)) {
+      return res.status(400).json({ error: 'secretKey is not in a valid Stellar secret key format' });
+    }
+
+    const wallet = await adapter.importWallet(trimmedSecretKey);
     res.status(201).json({ wallet });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -102,11 +125,30 @@ app.post('/transactions/:hash/fee-bump', async (req: Request, res: Response) => 
     const { hash } = req.params;
     const { maxFee, sponsorSecretKey } = req.body;
 
-    if (!maxFee) {
+    if (maxFee === undefined || maxFee === null) {
       return res.status(400).json({ error: 'maxFee is required' });
     }
 
-    const transaction = await adapter.feeBumpTransaction(hash, maxFee, sponsorSecretKey);
+    if (typeof maxFee !== 'string') {
+      return res.status(400).json({ error: 'maxFee must be provided as a string' });
+    }
+
+    const trimmedMaxFee = maxFee.trim();
+    if (!trimmedMaxFee) {
+      return res.status(400).json({ error: 'maxFee must be a non-empty string' });
+    }
+
+    // Ensure maxFee is a positive number string (e.g., "100", "0.5", "10.25")
+    if (!/^\d+(\.\d+)?$/.test(trimmedMaxFee)) {
+      return res.status(400).json({ error: 'maxFee must be a positive number string' });
+    }
+
+    const numericMaxFee = Number(trimmedMaxFee);
+    if (!Number.isFinite(numericMaxFee) || numericMaxFee <= 0) {
+      return res.status(400).json({ error: 'maxFee must be greater than 0' });
+    }
+
+    const transaction = await adapter.feeBumpTransaction(hash, trimmedMaxFee, sponsorSecretKey);
     res.status(201).json({ transaction });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

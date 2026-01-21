@@ -1,9 +1,7 @@
 // StellarRpcClient - Horizon API client for account management and transaction submission
-import { Horizon, Networks } from '@stellar/stellar-sdk';
+import { Horizon, Transaction, FeeBumpTransaction } from '@stellar/stellar-sdk';
 import * as StellarSdk from '@stellar/stellar-sdk';
-import type { Network } from '../types/cdp';
 import type { StellarAccount, StellarBalance, StellarTransactionResult, StellarNetworkConfig } from '../types/stellar';
-import { NETWORK_PASSPHRASES } from '../types/stellar';
 
 export class StellarRpcClient {
   private server: StellarSdk.Horizon.Server;
@@ -44,7 +42,7 @@ export class StellarRpcClient {
   async submitTransaction(transactionXdr: string): Promise<StellarTransactionResult> {
     try {
       const response = await this.server.submitTransaction(
-        new (await import('@stellar/stellar-sdk')).Transaction(transactionXdr, this.networkPassphrase)
+        new Transaction(transactionXdr, this.networkPassphrase)
       );
 
       return {
@@ -73,7 +71,6 @@ export class StellarRpcClient {
    */
   async submitFeeBumpTransaction(feeBumpTransactionXdr: string): Promise<StellarTransactionResult> {
     try {
-      const FeeBumpTransaction = (await import('@stellar/stellar-sdk')).FeeBumpTransaction;
       const feeBumpTx = new FeeBumpTransaction(feeBumpTransactionXdr, this.networkPassphrase);
       
       const response = await this.server.submitTransaction(feeBumpTx);

@@ -14,6 +14,14 @@ export class FeeEstimator {
    * For simple payments, use base fee. For complex operations, query network.
    */
   async estimateFee(operationCount: number = 1): Promise<string> {
+    if (
+      !Number.isFinite(operationCount) ||
+      !Number.isInteger(operationCount) ||
+      operationCount <= 0
+    ) {
+      throw new RangeError('operationCount must be a positive integer');
+    }
+
     try {
       // Try to get current fee stats from the network
       const feeStats = await this.rpcClient.getFeeStats();

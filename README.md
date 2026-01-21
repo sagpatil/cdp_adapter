@@ -42,6 +42,8 @@ const tx = await adapter.sendTransaction({
 console.log('Transaction hash:', tx.hash);
 
 // Fee bump a pending transaction (sponsored by Stellar Foundation or custom sponsor)
+// Note: sponsorSecretKey should be defined by the user or loaded from secure configuration
+const sponsorSecretKey = process.env.SPONSOR_SECRET_KEY; // Load from environment
 const bumpedTx = await adapter.feeBumpTransaction(
   tx.hash,
   '20000', // max fee in stroops

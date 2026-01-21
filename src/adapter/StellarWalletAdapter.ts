@@ -8,7 +8,6 @@ import { FeeEstimator } from './FeeEstimator';
 import { StellarRpcClient } from '../rpc/StellarRpcClient';
 import { EventNormalizer } from '../events/EventNormalizer';
 import { TransactionRequestSchema } from '../types/cdp';
-import { FeeBumpTransaction } from '@stellar/stellar-sdk';
 
 export class StellarWalletAdapter {
   private config: CDPAdapterConfig;
@@ -128,20 +127,6 @@ export class StellarWalletAdapter {
 
       return cdpTransaction;
     } catch (error: any) {
-      // Return failed transaction
-      const failedTransaction: CDPTransaction = {
-        id: this.generateTransactionId(),
-        hash: '',
-        status: 'failed',
-        from: request.from,
-        to: request.to,
-        amount: request.amount,
-        asset: request.asset || 'native',
-        fee: '0',
-        createdAt: new Date().toISOString(),
-        confirmedAt: new Date().toISOString(),
-      };
-
       throw new Error(`Transaction failed: ${error.message}`);
     }
   }
@@ -153,15 +138,41 @@ export class StellarWalletAdapter {
     try {
       const tx = await this.rpcClient.getTransaction(hash);
 
+      // Best-effort extraction of destination, amount and asset from operations (if present)
+      let to = '';
+      let amount = '';
+      let asset = 'native';
+
+      const txAny: any = tx as any;
+      const operations = Array.isArray(txAny.operations) ? txAny.operations : undefined;
+      if (operations && operations.length > 0) {
+        const paymentOp = operations.find((op: any) => op && op.type === 'payment');
+        if (paymentOp) {
+          if (typeof paymentOp.to === 'string') {
+            to = paymentOp.to;
+          }
+          if (typeof paymentOp.amount === 'string') {
+            amount = paymentOp.amount;
+          }
+          if (typeof paymentOp.asset_type === 'string') {
+            if (paymentOp.asset_type === 'native') {
+              asset = 'native';
+            } else if (typeof paymentOp.asset_code === 'string' && paymentOp.asset_code.length > 0) {
+              asset = paymentOp.asset_code;
+            }
+          }
+        }
+      }
+
       // Convert Stellar transaction to CDP format
       const cdpTransaction: CDPTransaction = {
         id: hash,
         hash: tx.hash,
         status: tx.successful ? 'success' : 'failed',
         from: tx.source_account,
-        to: '', // Would need to parse operations to get destination
-        amount: '', // Would need to parse operations
-        asset: 'native',
+        to,
+        amount,
+        asset,
         fee: tx.fee_charged,
         createdAt: tx.created_at,
         confirmedAt: tx.created_at,
@@ -225,8 +236,8 @@ export class StellarWalletAdapter {
       const originalEnvelopeXdr = originalTx.envelope_xdr;
 
       // Determine the fee source (sponsor)
-      let feeSourceAddress: string;
       let feeSourceSecret: string;
+      let feeSourceAddress: string;
 
       if (sponsorSecretKey) {
         // Use provided sponsor
@@ -234,7 +245,6 @@ export class StellarWalletAdapter {
         feeSourceAddress = this.signer.getPublicKey(sponsorSecretKey);
       } else {
         // Use Stellar Foundation sponsor for the current network
-        feeSourceAddress = STELLAR_FOUNDATION_SPONSORS[this.config.network];
         // Note: In production, this would require secure key management
         // For now, this is a placeholder - the actual secret key would need to be configured
         throw new Error(
@@ -256,8 +266,8 @@ export class StellarWalletAdapter {
       );
 
       // Sign the fee bump transaction with the sponsor's key
-      const signedFeeBumpTx = this.signer.signTransaction(
-        feeBumpTx as any,
+      const signedFeeBumpTx = this.signer.signFeeBumpTransaction(
+        feeBumpTx,
         feeSourceSecret
       );
 
@@ -266,15 +276,41 @@ export class StellarWalletAdapter {
         signedFeeBumpTx.toXDR()
       );
 
+      // Best-effort extraction of destination, amount and asset from original transaction
+      let to = '';
+      let amount = '';
+      let asset = 'native';
+
+      const txAny: any = originalTx as any;
+      const operations = Array.isArray(txAny.operations) ? txAny.operations : undefined;
+      if (operations && operations.length > 0) {
+        const paymentOp = operations.find((op: any) => op && op.type === 'payment');
+        if (paymentOp) {
+          if (typeof paymentOp.to === 'string') {
+            to = paymentOp.to;
+          }
+          if (typeof paymentOp.amount === 'string') {
+            amount = paymentOp.amount;
+          }
+          if (typeof paymentOp.asset_type === 'string') {
+            if (paymentOp.asset_type === 'native') {
+              asset = 'native';
+            } else if (typeof paymentOp.asset_code === 'string' && paymentOp.asset_code.length > 0) {
+              asset = paymentOp.asset_code;
+            }
+          }
+        }
+      }
+
       // Create CDP transaction object for the fee bump
       const cdpTransaction: CDPTransaction = {
         id: this.generateTransactionId(),
         hash: result.hash,
         status: result.successful ? 'success' : 'failed',
         from: originalTx.source_account,
-        to: '', // Would need to parse from original transaction
-        amount: '', // Would need to parse from original transaction
-        asset: 'native',
+        to,
+        amount,
+        asset,
         fee: maxFee,
         createdAt: new Date().toISOString(),
         confirmedAt: new Date().toISOString(),

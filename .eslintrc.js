@@ -11,7 +11,6 @@ module.exports = {
     es2022: true,
   },
   rules: {
-    'no-unused-vars': 'off',
-    'no-undef': 'off',
+    // These rules are handled by TypeScript compiler
   },
 };

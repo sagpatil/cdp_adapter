@@ -4,10 +4,8 @@ import {
   Operation,
   Asset,
   Memo,
-  Networks,
   Transaction,
   FeeBumpTransaction,
-  BASE_FEE,
 } from '@stellar/stellar-sdk';
 import type { CDPTransactionRequest } from '../types/cdp';
 import type { StellarAccount, StellarTransactionEnvelope, StellarOperation, FeeBumpConfig } from '../types/stellar';
