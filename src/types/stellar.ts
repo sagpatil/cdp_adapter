@@ -56,6 +56,20 @@ export interface StellarTransactionResult {
   envelopeXdr: string;
 }
 
+/** Fee bump configuration */
+export interface FeeBumpConfig {
+  maxFee: string;
+  feeSource?: string; // Optional sponsor account for fee payment
+}
+
+/** Stellar Foundation sponsor accounts (for fee bumps) */
+export const STELLAR_FOUNDATION_SPONSORS: Record<Network, string> = {
+  // These are example addresses - replace with actual Stellar Foundation sponsor accounts
+  testnet: 'GCTESTNETSPONSORFEEACCOUNT123456789ABCDEFGH',
+  mainnet: 'GCMAINNETSPONSORFEEACCOUNT123456789ABCDEFGH',
+  futurenet: 'GCFUTURENETSPONSORFEEACCOUNT123456789ABCDEFG',
+};
+
 /** Network passphrase constants */
 export const NETWORK_PASSPHRASES: Record<Network, string> = {
   mainnet: 'Public Global Stellar Network ; September 2015',
