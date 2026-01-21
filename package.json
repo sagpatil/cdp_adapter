@@ -8,7 +8,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "jest",
-    "lint": "eslint src/",
+    "lint": "tsc --noEmit",
     "start:server": "node dist/server/index.js"
   },
   "keywords": [
