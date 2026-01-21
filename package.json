@@ -10,7 +10,8 @@
     "test": "jest",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "start:server": "node dist/server/index.js"
+    "start:server": "node dist/server/index.js",
+    "integration:testnet": "bash scripts/integration-testnet.sh"
   },
   "keywords": [
     "stellar",
