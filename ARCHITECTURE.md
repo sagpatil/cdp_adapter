@@ -6,7 +6,7 @@ This document provides an overview of the system architecture for the CDP Stella
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                          CDP STELLAR ADAPTER ARCHITECTURE                        │
+│                          CDP STELLAR ADAPTER ARCHITECTURE                       │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
                               ┌─────────────────┐
@@ -26,40 +26,40 @@ This document provides an overview of the system architecture for the CDP Stella
             │                        │                        │ CDPTransaction
             ▼                        ▼                        │ CDPEvent
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│                         ADAPTER CORE LAYER                                     │
+│                         ADAPTER CORE LAYER                                    │
 │  ┌─────────────────────────────────────────────────────────────────────────┐  │
-│  │                    StellarWalletAdapter                                  │  │
-│  │                 (adapter/StellarWalletAdapter.ts)                        │  │
-│  │                                                                          │  │
+│  │                    StellarWalletAdapter                                 │  │
+│  │                 (adapter/StellarWalletAdapter.ts)                       │  │
+│  │                                                                         │  │
 │  │  • createWallet()      • sendTransaction()    • feeBumpTransaction()    │  │
 │  │  • getWallet()         • getTransaction()     • importWallet()          │  │
 │  │  • walletStore (Map)   • getStellarFoundationSponsor()                  │  │
 │  └─────────────────────────────────────────────────────────────────────────┘  │
-│                     │              │              │              │             │
-│        ┌───────────┴──────────┐   │   ┌─────────┴──────────┐   │             │
-│        ▼                      ▼   │   ▼                    ▼   │             │
-│  ┌───────────────┐  ┌─────────────┴───────┐  ┌──────────────────────┐        │
-│  │    Signer     │  │ TransactionBuilder  │  │    FeeEstimator      │        │
-│  │ (Signer.ts)   │  │(TransactionBuilder.ts)│  │  (FeeEstimator.ts)  │        │
-│  │               │  │                      │  │                     │        │
-│  │• generateKey  │  │• buildPaymentTx()   │  │• estimateFee()      │        │
-│  │• signTx()     │  │• buildFeeBumpTx()   │  │• getBaseFee()       │        │
-│  │• signFeeBump()│  │• parseAsset()       │  │                     │        │
-│  │• getPublicKey │  │• parseMemo()        │  │                     │        │
-│  └───────────────┘  └─────────────────────┘  └──────────────────────┘        │
+│                    │              │             │              │              │
+│        ┌───────────┴──────────┐   │   ┌─────────┴──────────┐   │              │
+│        ▼                      ▼   │   ▼                    ▼   │              │
+│  ┌───────────────┐  ┌─────────────┴───────┐  ┌──────────────────────┐         │
+│  │    Signer     │  │ TransactionBuilder  │  │    FeeEstimator      │         │
+│  │ (Signer.ts)   │  │TransactionBuilder.ts│  │  (FeeEstimator.ts)   │         │
+│  │               │  │                     │  │                      │         │
+│  │• generateKey  │  │• buildPaymentTx()   │  │• estimateFee()       │         │
+│  │• signTx()     │  │• buildFeeBumpTx()   │  │• getBaseFee()        │         │
+│  │• signFeeBump()│  │• parseAsset()       │  │                      │         │
+│  │• getPublicKey │  │• parseMemo()        │  │                      │         │
+│  └───────────────┘  └─────────────────────┘  └──────────────────────┘         │
 │                                                         │                     │
-│  ┌──────────────────────────────────────────────────────┴────────────────┐   │
-│  │                       EventNormalizer                                  │   │
-│  │                    (events/EventNormalizer.ts)                         │   │
-│  │  • createTransactionPendingEvent()  • normalizeTransactionResult()    │   │
-│  │  • createTransactionSuccessEvent()  • createWalletCreatedEvent()      │   │
-│  └────────────────────────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┴────────────────┐    │
+│  │                       EventNormalizer                                 │    │
+│  │                    (events/EventNormalizer.ts)                        │    │
+│  │  • createTransactionPendingEvent()  • normalizeTransactionResult()    │    │
+│  │  • createTransactionSuccessEvent()  • createWalletCreatedEvent()      │    │
+│  └───────────────────────────────────────────────────────────────────────┘    │
 └───────────────────────────────────────────────────────────────────────────────┘
                                        │
                                        │ Uses
                                        ▼
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│                              RPC LAYER                                         │
+│                              RPC LAYER                                        │
 │  ┌─────────────────────────────────────┐  ┌─────────────────────────────────┐ │
 │  │         StellarRpcClient            │  │      SorobanRpcClient           │ │
 │  │      (rpc/StellarRpcClient.ts)      │  │   (rpc/SorobanRpcClient.ts)     │ │
@@ -77,7 +77,7 @@ This document provides an overview of the system architecture for the CDP Stella
                                        │ HTTP/RPC
                                        ▼
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│                          STELLAR NETWORK                                       │
+│                          STELLAR NETWORK                                      │
 │  ┌─────────────────────────────────────┐  ┌─────────────────────────────────┐ │
 │  │           Horizon API               │  │        Soroban RPC              │ │
 │  │  horizon.stellar.org (mainnet)      │  │   soroban-rpc.stellar.org       │ │
