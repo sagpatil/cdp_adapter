@@ -2,6 +2,50 @@
 
 A TypeScript adapter that exposes CDP-style embedded wallet APIs while handling all Stellar-specific logic behind the scenes.
 
+## TL;DR (Plain English)
+
+This repo gives you a **CDP-shaped wallet API** for **Stellar**.
+
+- Your app (or any “CDP embedded wallet”-style consumer) talks to this adapter using familiar wallet methods like `createWallet()` and `sendTransaction()`.
+- The adapter does the Stellar-heavy lifting for you: generating keypairs, building XDR, signing, fee estimation, and submitting to Horizon/Soroban.
+
+Important: calling `createWallet()` generates keys locally; the account only “exists on-chain” once it’s **funded** (on testnet, that’s usually via Friendbot).
+
+### How requests flow
+
+```
+App / CDP-style caller
+        |
+        |  (CDP-like requests + responses)
+        v
+  CDP Stellar Adapter
+        |
+        |  (Stellar XDR + RPC calls)
+        v
+Stellar Network Services
+ (Horizon + Soroban RPC)
+```
+
+### Create wallet (local) vs create account (on-chain)
+
+```
+createWallet()  -> generates keypair locally
+fund account    -> creates the account on Stellar (testnet: Friendbot)
+```
+
+### Send payment flow
+
+```
+sendTransaction(request)
+  -> validate request (zod)
+  -> Horizon: loadAccount(from) [sequence]
+  -> Horizon: feeStats() [fee]
+  -> build XDR (payment op)
+  -> sign XDR (secret key)
+  -> Horizon: submitTransaction(XDR)
+  -> return CDPTransaction (+ optional events)
+```
+
 ## Features
 
 - **CDP-Compatible API** - Familiar wallet interfaces for embedded wallet integration
